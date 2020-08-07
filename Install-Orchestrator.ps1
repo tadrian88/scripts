@@ -113,7 +113,7 @@ param(
   [string] $orchestratorTennant = "Default",
 
   [Parameter()]
-  [string] $orchestratorLicenseCode,
+  [string] $orchestratorLicenseCode
 
   # [Parameter(Mandatory = $true)]
   # [string] $publicUrl

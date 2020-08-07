@@ -115,8 +115,8 @@ param(
   [Parameter()]
   [string] $orchestratorLicenseCode,
 
-  [Parameter(Mandatory = $true)]
-  [string] $publicUrl
+  # [Parameter(Mandatory = $true)]
+  # [string] $publicUrl
 )
 #Enable TLS12
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
@@ -280,7 +280,7 @@ function Main {
     "APP_MACHINE_DECRYPTION_KEY"  = "$($getEncryptionKey.DecryptionKey)";
     "APP_MACHINE_VALIDATION_KEY"  = "$($getEncryptionKey.Validationkey)";
     "TELEMETRY_ENABLED"           = "0";
-    "PUBLIC_URL" = "$($publicUrl)";
+    #"PUBLIC_URL" = "$($publicUrl)";
   }
 
   if ($appPoolIdentityType -eq "USER") {

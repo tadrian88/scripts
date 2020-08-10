@@ -213,6 +213,8 @@ function Main {
     Log-Error -LogPath $sLogFile -ErrorDesc "$($_.exception.message) installing $feature" -ExitGracefully $True
   }
 
+  
+
   #Login to Oracle Cloud via API
 
 
@@ -237,13 +239,31 @@ function Main {
 
   # ((Invoke-WebRequest -Uri http://169.254.169.254/latest/meta-data/public-hostname -UseBasicParsing).RawContent -split "`n")[-1]
 
-  $cert = New-SelfSignedCertificate -DnsName "$env:COMPUTERNAME", "$orchestratorHostname" -CertStoreLocation cert:\LocalMachine\My -FriendlyName "Orchestrator Self-Signed certificate" -KeySpec Signature -HashAlgorithm SHA256 -KeyExportPolicy Exportable  -NotAfter (Get-Date).AddYears(20)
+  Write-Output "$(Get-Date) Installing self signed certificate for IIS, exporting and importing to LocalMachine Root"
+  
+  $certPass = "1234" | ConvertTo-SecureString -AsPlainText -Force
+  $cert = Import-PfxCertificate -FilePath "C:\scripts\RootCA.pfx" -CertStoreLocation Cert:\LocalMachine\My -Password $certPass
+  # The cert is required to be in personal store for the New-SefSignedCertificate cmdlet -Signer argument
+  Import-PfxCertificate -FilePath "C:\scripts\RootCA.pfx" -CertStoreLocation Cert:\LocalMachine\Root -Password $certPass
 
-  $thumbprint = $cert.Thumbprint
+  $installCert = New-SelfSignedCertificate -Type SSLServerAuthentication `
+    -Subject "CN=UiPathInstallCert" -KeyExportPolicy Exportable `
+    -DnsName "$orchestratorHostname" `
+    -FriendlyName "Orchestrator Self-Signed Install Certificate" `
+    -HashAlgorithm sha256 -KeyLength 2048 `
+    -NotAfter (Get-Date).AddYears(20) `
+    -CertStoreLocation "cert:\LocalMachine\My" `
+    -Signer $cert
 
-  Export-Certificate -Cert cert:\localmachine\my\$thumbprint -FilePath "$($tempDirectory)\OrchPublicKey.cer" -force
+  $thumbprint = $installCert.Thumbprint
+  
+  #$cert = New-SelfSignedCertificate -DnsName "$env:COMPUTERNAME", "$orchestratorHostname" -CertStoreLocation cert:\LocalMachine\My -FriendlyName "Orchestrator Self-Signed certificate" -KeySpec Signature -HashAlgorithm SHA256 -KeyExportPolicy Exportable  -NotAfter (Get-Date).AddYears(20)
 
-  Import-Certificate -FilePath "$($tempDirectory)\OrchPublicKey.cer" -CertStoreLocation "cert:\LocalMachine\Root"
+  #$thumbprint = $cert.Thumbprint
+
+  #Export-Certificate -Cert cert:\localmachine\my\$thumbprint -FilePath "$($tempDirectory)\OrchPublicKey.cer" -force
+
+  #Import-Certificate -FilePath "$($tempDirectory)\OrchPublicKey.cer" -CertStoreLocation "cert:\LocalMachine\Root"
 
   #install Orchestrator
 
@@ -312,8 +332,11 @@ function Main {
   Remove-WebBinding -Name "Default Web Site" -BindingInformation "*:80:"
 
   #add public DNS to bindings
-  New-WebBinding -Name "UiPath*" -IPAddress "*" -Protocol http
   New-WebBinding -Name "UiPath*" -IPAddress "*" -Protocol https
+
+  Write-Output "$(Get-Date) Add SSL cert"
+  $sslbinding = Get-WebBinding -Protocol "https"
+  $sslbinding.AddSslCertificate($thumbprint, "my")
 
   #stopping default website
   Set-ItemProperty "IIS:\Sites\Default Web Site" serverAutoStart False

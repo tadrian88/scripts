@@ -32,8 +32,8 @@
     .PARAMETER redisServerHost
       String. There is no need to use Redis if there is only one Orchestrator instance. Redis is mandatory in multi-node deployment.  Example: $redisServerHost = "redishostDNS"
 
-    .PARAMETER nuGetStoragePath
-      String. Mandatory. Storage Path where the Nuget Packages are saved. Also you can use NFS or SMB share.  Example: $nuGetStoragePath = "\\nfs-share\NugetPackages"
+    .PARAMETER storageLocation
+      String. Mandatory. Storage Path where the Nuget Packages are saved. Also you can use NFS or SMB share.  Example: $storageLocation = "\\nfs-share\NugetPackages"
 
     .PARAMETER orchestratorAdminPassword
       String. Mandatory. Orchestrator Admin password is necessary for a new installation and to change the Nuget API keys. Example: $orchestratorAdminPassword = "P@ssW05D!"
@@ -51,15 +51,15 @@
       None
 
     .Example
-      powershell.exe -ExecutionPolicy Bypass -File "\\fileLocation\Install-UiPathOrchestrator.ps1" -OrchestratorVersion "19.4.3" -orchestratorFolder "C:\Program Files\UiPath\Orchestrator" -passphrase "AnyPassPhrase!@#$" -databaseServerName  "SQLServerName.local"  -databaseName "devtestdb"  -databaseUserName "devtestdbuser" -databaseUserPassword "d3vt3std@taB@s3!" -orchestratorAdminPassword "P@ssW05D!" -redisServerHost "redishostDNS" -NuGetStoragePath "\\nfs-share\NugetPackages"
+      powershell.exe -ExecutionPolicy Bypass -File "\\fileLocation\Install-UiPathOrchestrator.ps1" -OrchestratorVersion "19.4.3" -orchestratorFolder "C:\Program Files\UiPath\Orchestrator" -passphrase "AnyPassPhrase!@#$" -databaseServerName  "SQLServerName.local"  -databaseName "devtestdb"  -databaseUserName "devtestdbuser" -databaseUserPassword "d3vt3std@taB@s3!" -orchestratorAdminPassword "P@ssW05D!" -redisServerHost "redishostDNS" -storageLocation "\\nfs-share\NugetPackages"
 #>
 [CmdletBinding()]
 
 param(
 
   [Parameter()]
-  [ValidateSet('19.10.19', '20.4.1')]
-  [string] $orchestratorVersion = "20.4.1",
+  [ValidateSet('19.10.19', '20.4.2')]
+  [string] $orchestratorVersion = "20.4.2",
 
   [Parameter()]
   [string] $orchestratorFolder = "${env:ProgramFiles(x86)}\UiPath\Orchestrator",
@@ -101,7 +101,7 @@ param(
   [string[]] $redisServerHost,
 
   [Parameter()]
-  [string] $nuGetStoragePath,
+  [string] $storageLocation,
 
   [Parameter()]
   [string] $orchestratorAdminUsername = "admin",
@@ -113,7 +113,19 @@ param(
   [string] $orchestratorTennant = "Default",
 
   [Parameter()]
-  [string] $orchestratorLicenseCode
+  [string] $orchestratorLicenseCode,
+
+  [Parameter()]
+  [string]
+  $outputParametersFile,
+
+  [Parameter()]
+  [string]
+  $ParametersFile,
+
+  [Parameter()]
+  [string]
+  $QuartzClustered
 
   # [Parameter(Mandatory = $true)]
   # [string] $publicUrl
@@ -213,21 +225,6 @@ function Main {
     Log-Error -LogPath $sLogFile -ErrorDesc "$($_.exception.message) installing $feature" -ExitGracefully $True
   }
 
-  
-
-  #Login to Oracle Cloud via API
-
-
-  # $dataLogin = @{
-  #   compartmentId  = $orchestratorTennant
-  #   instancePoolId = $orchestratorAdminUsername
-  #   password       = $orchestratorAdminPassword
-  # } | ConvertTo-Json
-
-  # $oracleUrl_login = "https://$region.oraclecloud.com"
-
-  # $listInstancesAPI = "/20160918/instancePools/$instancePoolId/instances"
-
   # #Get the login session used for all requests
   # $orchWebResponse = Invoke-RestMethod -Uri $orchUrl_login  -Method Post -Body $dataLogin -ContentType "application/json" -UseBasicParsing -Session websession
 
@@ -236,8 +233,6 @@ function Main {
 
   # install .Net 4.7.2
   Install-DotNetFramework -dotNetFrameworkPath "$tempDirectory\NDP472-KB4054530-x86-x64-AllOS-ENU.exe"
-
-  # ((Invoke-WebRequest -Uri http://169.254.169.254/latest/meta-data/public-hostname -UseBasicParsing).RawContent -split "`n")[-1]
 
   Write-Output "$(Get-Date) Installing self signed certificate for IIS, exporting and importing to LocalMachine Root"
   
@@ -269,24 +264,6 @@ function Main {
 
   $getEncryptionKey = Generate-Key -passphrase $passphrase
 
-  $msiFeatures = @("OrchestratorFeature")
-
-  if ($orchestratorVersion.StartsWith("2")) {
-
-    $msiFeatures += @("IdentityFeature")
-
-    try {
-
-      Install-DotNetHostingBundle -DotNetHostingBundlePath "$tempDirectory\dotnet-hosting-3.1.3-win.exe"
-
-    }
-    catch {
-      Write-Error $_.exception.message
-      Log-Error -LogPath $sLogFile -ErrorDesc "$($_.exception.message) installing Dotnet hosting" -ExitGracefully $True
-    }
-
-  }
-
   $msiProperties = @{ }
   $msiProperties += @{
     "ORCHESTRATORFOLDER"          = "`"$($orchestratorFolder)`"";
@@ -300,7 +277,7 @@ function Main {
     "APP_MACHINE_DECRYPTION_KEY"  = "$($getEncryptionKey.DecryptionKey)";
     "APP_MACHINE_VALIDATION_KEY"  = "$($getEncryptionKey.Validationkey)";
     "TELEMETRY_ENABLED"           = "0";
-    #"PUBLIC_URL" = "$($publicUrl)";
+    "QUARTZ_CLUSTERED"            = "$($QuartzClustered)";
   }
 
   if ($appPoolIdentityType -eq "USER") {
@@ -316,7 +293,7 @@ function Main {
   }
 
   if ($databaseAuthenticationMode -eq "SQL") {
-    $msiProperties += @{
+    $msiProperties += 
       "DB_AUTHENTICATION_MODE" = "SQL";
       "DB_USER_NAME"           = "$($databaseUserName)";
       "DB_PASSWORD"            = "$($databaseUserPassword)";
@@ -325,6 +302,43 @@ function Main {
   else {
     $msiProperties += @{"DB_AUTHENTICATION_MODE" = "WINDOWS"; }
   }
+
+  if ($outputParametersFile) {
+    $msiProperties += @{
+      "OUTPUT_PARAMETERS_FILE"      = "$($outputParametersFile)";
+    }
+  }
+  elseif ($ParametersFile) {
+    $msiProperties += @{
+      "PARAMETERS_FILE"      = "$($ParametersFile)";
+      "SECONDARY_NODE"       = "1"
+    }
+  }
+
+  $msiFeatures = @("OrchestratorFeature")
+
+  if ($orchestratorVersion.StartsWith("2")) {
+
+    $msiFeatures += @("IdentityFeature")
+
+    $msiProperties += @{
+      "PUBLIC_URL" = "$($publicUrl)";
+      "CERTIFICATE_SUBJECT " = "$($certificateSubject)"
+    }
+
+    try {
+
+      Install-DotNetHostingBundle -DotNetHostingBundlePath "$tempDirectory\dotnet-hosting-3.1.3-win.exe"
+
+    }
+    catch {
+      Write-Error $_.exception.message
+      Log-Error -LogPath $sLogFile -ErrorDesc "Failed installing Dotnet hosting. Error: $($_.exception.message) " -ExitGracefully $True
+    }
+
+  }
+
+  #TODO add PUBLIC_URL, CERTIFICATE_SUBJECT params; create condition for 19.10.x and 20.4.x
 
   Install-UiPathOrchestratorEnterprise -msiPath "$($tempDirectory)\UiPathOrchestrator.msi" -logPath "$($sLogPath)\InstallOrchestrator.log" -msiFeatures $msiFeatures -msiProperties $msiProperties
 
@@ -372,28 +386,12 @@ function Main {
   }
 
   #set storage path
-  if ($nuGetStoragePath) {
+  if ($storageLocation) {
 
-    if ($orchestratorVersion -lt "19.4.1") {
-
-      $LBkey = @("NuGet.Packages.Path", "NuGet.Activities.Path" )
-
-      $LBvalue = @("\\$($nuGetStoragePath)", "\\$($nuGetStoragePath)\Activities")
-
-      for ($i = 0; $i -lt $LBkey.count; $i++) {
-
-        Set-AppSettings -path "$orchestratorFolder" -key $LBkey[$i] -value $LBvalue[$i]
-
-      }
-
+    $LBkey = "Storage.Location"
+    $LBvalue = "RootPath=\\$($storageLocation)"
+    Set-AppSettings -path "$orchestratorFolder" -key $LBkey -value $LBvalue
     }
-    else {
-      $LBkey = "Storage.Location"
-      $LBvalue = "RootPath=\\$($nuGetStoragePath)"
-      Set-AppSettings -path "$orchestratorFolder" -key $LBkey -value $LBvalue
-    }
-
-  }
 
   # Remove temp directory
   Log-Write -LogPath $sLogFile -LineValue "Removing temp directory $($tempDirectory)"

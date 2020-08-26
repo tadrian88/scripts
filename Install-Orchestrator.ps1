@@ -121,11 +121,7 @@ param(
 
   [Parameter()]
   [string]
-  $ParametersFile,
-
-  [Parameter()]
-  [string]
-  $QuartzClustered
+  $ParametersFile
 
   # [Parameter(Mandatory = $true)]
   # [string] $publicUrl
@@ -293,7 +289,7 @@ function Main {
   }
 
   if ($databaseAuthenticationMode -eq "SQL") {
-    $msiProperties += 
+    $msiProperties += @{
       "DB_AUTHENTICATION_MODE" = "SQL";
       "DB_USER_NAME"           = "$($databaseUserName)";
       "DB_PASSWORD"            = "$($databaseUserPassword)";
@@ -471,9 +467,7 @@ function Main {
     }
 
   }
-
 }
-
 <#
 .DESCRIPTION
 Installs an MSI by calling msiexec.exe, with verbose logging

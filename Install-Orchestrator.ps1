@@ -232,7 +232,7 @@ function Main {
 
   Write-Output "$(Get-Date) Installing self signed certificate for IIS, exporting and importing to LocalMachine Root"
   
-  $certPass = "1234" | ConvertTo-SecureString -AsPlainText -Force
+  $certPass = "12345" | ConvertTo-SecureString -AsPlainText -Force
   $cert = Import-PfxCertificate -FilePath "C:\scripts\testroot.pfx" -CertStoreLocation Cert:\LocalMachine\My -Password $certPass
   # The cert is required to be in personal store for the New-SefSignedCertificate cmdlet -Signer argument
   Import-PfxCertificate -FilePath "C:\scripts\testroot.pfx" -CertStoreLocation Cert:\LocalMachine\Root -Password $certPass

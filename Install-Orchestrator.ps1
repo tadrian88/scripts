@@ -225,7 +225,7 @@ function Main {
   # $orchWebResponse = Invoke-RestMethod -Uri $orchUrl_login  -Method Post -Body $dataLogin -ContentType "application/json" -UseBasicParsing -Session websession
 
   #install URLrewrite
-  Install-UrlRewrite -urlRWpath "$tempDirectory\rewrite_amd64.msi"
+  Install-UrlRewrite -urlRWpath "$tempDirectory\rewrite_amd64_en-US.msi"
 
   # install .Net 4.7.2
   Install-DotNetFramework -dotNetFrameworkPath "$tempDirectory\NDP472-KB4054530-x86-x64-AllOS-ENU.exe"
@@ -233,9 +233,9 @@ function Main {
   Write-Output "$(Get-Date) Installing self signed certificate for IIS, exporting and importing to LocalMachine Root"
   
   $certPass = "1234" | ConvertTo-SecureString -AsPlainText -Force
-  $cert = Import-PfxCertificate -FilePath "C:\scripts\RootCA.pfx" -CertStoreLocation Cert:\LocalMachine\My -Password $certPass
+  $cert = Import-PfxCertificate -FilePath "C:\scripts\testroot.pfx" -CertStoreLocation Cert:\LocalMachine\My -Password $certPass
   # The cert is required to be in personal store for the New-SefSignedCertificate cmdlet -Signer argument
-  Import-PfxCertificate -FilePath "C:\scripts\RootCA.pfx" -CertStoreLocation Cert:\LocalMachine\Root -Password $certPass
+  Import-PfxCertificate -FilePath "C:\scripts\testroot.pfx" -CertStoreLocation Cert:\LocalMachine\Root -Password $certPass
 
   $installCert = New-SelfSignedCertificate -Type SSLServerAuthentication `
     -Subject "CN=UiPathInstallCert" -KeyExportPolicy Exportable `

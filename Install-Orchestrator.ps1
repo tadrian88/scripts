@@ -121,7 +121,11 @@ param(
 
   [Parameter()]
   [string]
-  $ParametersFile
+  $ParametersFile,
+
+  [Parameter()]
+  [string]
+  $QuartzClustered
 
   # [Parameter(Mandatory = $true)]
   # [string] $publicUrl

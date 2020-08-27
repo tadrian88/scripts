@@ -317,10 +317,11 @@ function Main {
 
     $msiFeatures += @("IdentityFeature")
 
-    $msiProperties += @{
-      "PUBLIC_URL" = "$($publicUrl)";
-      "CERTIFICATE_SUBJECT " = "$($certificateSubject)"
-    }
+    #TODO to add them once installation works
+    # $msiProperties += @{
+    #   "PUBLIC_URL" = "$($publicUrl)";
+    #   "CERTIFICATE_SUBJECT" = "$($certificateSubject)"
+    # }
 
     try {
 
@@ -560,7 +561,7 @@ function Install-UiPathOrchestratorEnterprise {
     $logPath = Join-Path $script:tempDirectory "install.log"
   }
 
-  Log-Write -LogPath $sLogFile -LineValue "Installing UiPath and its feature $($msiFeatures)"
+  Log-Write -LogPath $sLogFile -LineValue "Installing UiPath and its features $($msiFeatures)"
 
   $process = Invoke-MSIExec -msiPath $msiPath -logPath $logPath -features $msiFeatures -properties $msiProperties
 

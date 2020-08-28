@@ -128,11 +128,12 @@ param(
   $QuartzClustered,
 
   [Parameter()]
-  [ParameterType]
+  [string]
   $certificateSubject,
 
   [Parameter(Mandatory = $true)]
-  [string] $publicUrl
+  [string] 
+  $publicUrl
 )
 #Enable TLS12
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12

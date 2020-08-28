@@ -125,10 +125,14 @@ param(
 
   [Parameter()]
   [string]
-  $QuartzClustered
+  $QuartzClustered,
 
-  # [Parameter(Mandatory = $true)]
-  # [string] $publicUrl
+  [Parameter()]
+  [ParameterType]
+  $certificateSubject,
+
+  [Parameter(Mandatory = $true)]
+  [string] $publicUrl
 )
 #Enable TLS12
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
@@ -322,10 +326,10 @@ function Main {
     $msiFeatures += @("IdentityFeature")
 
     #TODO to add them once installation works
-    # $msiProperties += @{
-    #   "PUBLIC_URL" = "$($publicUrl)";
-    #   "CERTIFICATE_SUBJECT" = "$($certificateSubject)"
-    # }
+    $msiProperties += @{
+      "PUBLIC_URL" = "$($publicUrl)";
+      "CERTIFICATE_SUBJECT" = "$thumbprint"
+    }
 
     try {
 

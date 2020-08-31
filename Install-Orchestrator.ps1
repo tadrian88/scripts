@@ -253,10 +253,10 @@ function Main {
     -HashAlgorithm sha256 -KeyLength 2048 `
     -NotAfter (Get-Date).AddYears(20) `
     -CertStoreLocation "cert:\LocalMachine\My" `
-    -Signer $cert
+    -Signer $cert `
+    -KeySpec KeyExchange
 
   $thumbprint = $installCert.Thumbprint
-  
   #$cert = New-SelfSignedCertificate -DnsName "$env:COMPUTERNAME", "$orchestratorHostname" -CertStoreLocation cert:\LocalMachine\My -FriendlyName "Orchestrator Self-Signed certificate" -KeySpec Signature -HashAlgorithm SHA256 -KeyExportPolicy Exportable  -NotAfter (Get-Date).AddYears(20)
 
   #$thumbprint = $cert.Thumbprint

@@ -247,7 +247,7 @@ function Main {
   Import-PfxCertificate -FilePath "C:\scripts\testroot.pfx" -CertStoreLocation Cert:\LocalMachine\Root -Password $certPass
 
   $installCert = New-SelfSignedCertificate -Type SSLServerAuthentication `
-    -Subject "CN=UiPathInstallCert" -KeyExportPolicy Exportable `
+    -Subject "CN=$orchestratorHostname" -KeyExportPolicy Exportable `
     -DnsName "$orchestratorHostname" `
     -FriendlyName "Orchestrator Self-Signed Install Certificate" `
     -HashAlgorithm sha256 -KeyLength 2048 `

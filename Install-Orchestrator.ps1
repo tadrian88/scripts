@@ -329,7 +329,7 @@ function Main {
     #TODO to add them once installation works
     $msiProperties += @{
       "PUBLIC_URL" = "$($publicUrl)";
-      "CERTIFICATE_SUBJECT" = "$thumbprint"
+      "CERTIFICATE_SUBJECT" = "$orchestratorHostname"
     }
 
     try {

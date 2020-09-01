@@ -268,6 +268,7 @@ function Main {
   #install Orchestrator
 
   $msiFeatures = @("OrchestratorFeature", "IdentityFeature")
+  $msiProperties = @{ }
 
   if ($outputParametersFile) {
 
@@ -276,8 +277,7 @@ function Main {
     }
 
     $getEncryptionKey = Generate-Key -passphrase $passphrase
-
-    $msiProperties = @{ }
+    
     $msiProperties += @{
       "ORCHESTRATORFOLDER"          = "`"$($orchestratorFolder)`"";
       "DB_SERVER_NAME"              = "$($databaseServerName)";

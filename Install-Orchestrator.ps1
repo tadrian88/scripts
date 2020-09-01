@@ -58,7 +58,7 @@
 param(
 
   [Parameter()]
-  [ValidateSet('19.10.19', '20.4.3')]
+  [ValidateSet('20.4.3')]
   [string] $orchestratorVersion = "20.4.3",
 
   [Parameter()]
@@ -267,85 +267,74 @@ function Main {
 
   #install Orchestrator
 
-  $getEncryptionKey = Generate-Key -passphrase $passphrase
-
-  $msiProperties = @{ }
-  $msiProperties += @{
-    "ORCHESTRATORFOLDER"          = "`"$($orchestratorFolder)`"";
-    "DB_SERVER_NAME"              = "$($databaseServerName)";
-    "DB_DATABASE_NAME"            = "$($databaseName)";
-    "HOSTADMIN_PASSWORD"          = "$($orchestratorAdminPassword)";
-    "DEFAULTTENANTADMIN_PASSWORD" = "$($orchestratorAdminPassword)";
-    "APP_ENCRYPTION_KEY"          = "$($getEncryptionKey.encryptionKey)";
-    "APP_NUGET_ACTIVITIES_KEY"    = "$($getEncryptionKey.nugetKey)";
-    "APP_NUGET_PACKAGES_KEY"      = "$($getEncryptionKey.nugetKey)";
-    "APP_MACHINE_DECRYPTION_KEY"  = "$($getEncryptionKey.DecryptionKey)";
-    "APP_MACHINE_VALIDATION_KEY"  = "$($getEncryptionKey.Validationkey)";
-    "TELEMETRY_ENABLED"           = "0";
-    "QUARTZ_CLUSTERED"            = "$($QuartzClustered)";
-  }
-
-  if ($appPoolIdentityType -eq "USER") {
-
-    $msiProperties += @{
-      "APPPOOL_IDENTITY_TYPE" = "USER";
-      "APPPOOL_USER_NAME"     = "$($appPoolIdentityUser)";
-      "APPPOOL_PASSWORD"      = "$($appPoolIdentityUserPassword)";
-    }
-  }
-  else {
-    $msiProperties += @{"APPPOOL_IDENTITY_TYPE" = "APPPOOLIDENTITY"; }
-  }
-
-  if ($databaseAuthenticationMode -eq "SQL") {
-    $msiProperties += @{
-      "DB_AUTHENTICATION_MODE" = "SQL";
-      "DB_USER_NAME"           = "$($databaseUserName)";
-      "DB_PASSWORD"            = "$($databaseUserPassword)";
-    }
-  }
-  else {
-    $msiProperties += @{"DB_AUTHENTICATION_MODE" = "WINDOWS"; }
-  }
+  $msiFeatures = @("OrchestratorFeature", "IdentityFeature")
 
   if ($outputParametersFile) {
+
     $msiProperties += @{
-      "OUTPUT_PARAMETERS_FILE"      = "$($outputParametersFile)";
+      "OUTPUT_PARAMETERS_FILE" = "$($outputParametersFile)";
+    }
+
+    $getEncryptionKey = Generate-Key -passphrase $passphrase
+
+    $msiProperties = @{ }
+    $msiProperties += @{
+      "ORCHESTRATORFOLDER"          = "`"$($orchestratorFolder)`"";
+      "DB_SERVER_NAME"              = "$($databaseServerName)";
+      "DB_DATABASE_NAME"            = "$($databaseName)";
+      "HOSTADMIN_PASSWORD"          = "$($orchestratorAdminPassword)";
+      "DEFAULTTENANTADMIN_PASSWORD" = "$($orchestratorAdminPassword)";
+      "APP_ENCRYPTION_KEY"          = "$($getEncryptionKey.encryptionKey)";
+      "APP_NUGET_ACTIVITIES_KEY"    = "$($getEncryptionKey.nugetKey)";
+      "APP_NUGET_PACKAGES_KEY"      = "$($getEncryptionKey.nugetKey)";
+      "APP_MACHINE_DECRYPTION_KEY"  = "$($getEncryptionKey.DecryptionKey)";
+      "APP_MACHINE_VALIDATION_KEY"  = "$($getEncryptionKey.Validationkey)";
+      "TELEMETRY_ENABLED"           = "0";
+      "QUARTZ_CLUSTERED"            = "$($QuartzClustered)";
+      "PUBLIC_URL"                  = "$($publicUrl)";
+      "CERTIFICATE_SUBJECT"         = "$thumbprint"
+      "IS_CERTIFICATE_SUBJECT"      = "$thumbprint"
+    }
+
+    if ($appPoolIdentityType -eq "USER") {
+
+      $msiProperties += @{
+        "APPPOOL_IDENTITY_TYPE" = "USER";
+        "APPPOOL_USER_NAME"     = "$($appPoolIdentityUser)";
+        "APPPOOL_PASSWORD"      = "$($appPoolIdentityUserPassword)";
+      }
+    }
+    else {
+      $msiProperties += @{"APPPOOL_IDENTITY_TYPE" = "APPPOOLIDENTITY"; }
+    }
+
+    if ($databaseAuthenticationMode -eq "SQL") {
+      $msiProperties += @{
+        "DB_AUTHENTICATION_MODE" = "SQL";
+        "DB_USER_NAME"           = "$($databaseUserName)";
+        "DB_PASSWORD"            = "$($databaseUserPassword)";
+      }
+    }
+    else {
+      $msiProperties += @{"DB_AUTHENTICATION_MODE" = "WINDOWS"; }
     }
   }
   elseif ($ParametersFile) {
     $msiProperties += @{
-      "PARAMETERS_FILE"      = "$($ParametersFile)";
-      "SECONDARY_NODE"       = "1"
+      "PARAMETERS_FILE" = "$($ParametersFile)";
+      "SECONDARY_NODE"  = "1"
     }
   }
 
-  $msiFeatures = @("OrchestratorFeature")
+  try {
 
-  if ($orchestratorVersion.StartsWith("2")) {
-
-    $msiFeatures += @("IdentityFeature")
-
-    #TODO to add them once installation works
-    $msiProperties += @{
-      "PUBLIC_URL" = "$($publicUrl)";
-      "CERTIFICATE_SUBJECT" = "$thumbprint"
-      "IS_CERTIFICATE_SUBJECT" = "$thumbprint"
-    }
-
-    try {
-
-      Install-DotNetHostingBundle -DotNetHostingBundlePath "$tempDirectory\dotnet-hosting-3.1.3-win.exe"
-
-    }
-    catch {
-      Write-Error $_.exception.message
-      Log-Error -LogPath $sLogFile -ErrorDesc "Failed installing Dotnet hosting. Error: $($_.exception.message) " -ExitGracefully $True
-    }
+    Install-DotNetHostingBundle -DotNetHostingBundlePath "$tempDirectory\dotnet-hosting-3.1.3-win.exe"
 
   }
-
-  #TODO add PUBLIC_URL, CERTIFICATE_SUBJECT params; create condition for 19.10.x and 20.4.x
+  catch {
+    Write-Error $_.exception.message
+    Log-Error -LogPath $sLogFile -ErrorDesc "Failed installing Dotnet hosting. Error: $($_.exception.message) " -ExitGracefully $True
+  }
 
   Install-UiPathOrchestratorEnterprise -msiPath "$($tempDirectory)\UiPathOrchestrator.msi" -logPath "$($sLogPath)\InstallOrchestrator.log" -msiFeatures $msiFeatures -msiProperties $msiProperties
 
@@ -398,7 +387,7 @@ function Main {
     $LBkey = "Storage.Location"
     $LBvalue = "RootPath=\\$($storageLocation)"
     Set-AppSettings -path "$orchestratorFolder" -key $LBkey -value $LBvalue
-    }
+  }
 
   # Remove temp directory
   Log-Write -LogPath $sLogFile -LineValue "Removing temp directory $($tempDirectory)"

@@ -247,8 +247,8 @@ function Main {
   Import-PfxCertificate -FilePath "C:\scripts\testroot.pfx" -CertStoreLocation Cert:\LocalMachine\Root -Password $certPass
 
   $installCert = New-SelfSignedCertificate -Type SSLServerAuthentication `
-    -Subject "CN=$orchestratorHostname" -KeyExportPolicy Exportable `
-    -DnsName "$orchestratorHostname" `
+    -Subject "CN=*.oraclevcn.com" -KeyExportPolicy Exportable `
+    -DnsName "*.oraclevcn.com" `
     -FriendlyName "Orchestrator Self-Signed Install Certificate" `
     -HashAlgorithm sha256 -KeyLength 2048 `
     -NotAfter (Get-Date).AddYears(20) `
@@ -329,7 +329,8 @@ function Main {
     #TODO to add them once installation works
     $msiProperties += @{
       "PUBLIC_URL" = "$($publicUrl)";
-      "CERTIFICATE_SUBJECT" = "$orchestratorHostname"
+      "CERTIFICATE_SUBJECT" = "$thumbprint"
+      "IS_CERTIFICATE_SUBJECT" = "$thumbprint"
     }
 
     try {

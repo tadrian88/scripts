@@ -113,7 +113,23 @@ param(
     [string] $orchestratorTennant = "Default",
 
     [Parameter()]
-    [string] $orchestratorLicenseCode
+    [string] $orchestratorLicenseCode,
+
+    [Parameter()]
+    [string]
+    $certificateSubject,
+
+    [Parameter()]
+    [string] 
+    $ISCertificateSubject,
+
+    [Parameter()]
+    [string] 
+    $certificatePass,
+
+    [Parameter()]
+    [string] 
+    $certificateBase64
 
 )
 #Enable TLS12
@@ -217,63 +233,46 @@ function Main {
     # install .Net 4.7.2
     Install-DotNetFramework -dotNetFrameworkPath "$tempDirectory\NDP472-KB4054530-x86-x64-AllOS-ENU.exe"
 
-    # ((Invoke-WebRequest -Uri http://169.254.169.254/latest/meta-data/public-hostname -UseBasicParsing).RawContent -split "`n")[-1]
-
-    $cert = New-SelfSignedCertificate -DnsName "$env:COMPUTERNAME", "$orchestratorHostname" -CertStoreLocation cert:\LocalMachine\My -FriendlyName "Orchestrator Self-Signed certificate" -KeySpec Signature -HashAlgorithm SHA256 -KeyExportPolicy Exportable  -NotAfter (Get-Date).AddYears(20)
+    Write-Output "$(Get-Date) Installing self signed certificate for IIS, exporting and importing to LocalMachine Root"
+  
+    $certPass = $($certificatePass) | ConvertTo-SecureString -AsPlainText -Force
+    $rawCert = [System.Convert]::FromBase64String($($certificateBase64))
+    [io.file]::WriteAllBytes("$tempDirectory\YourCert.pfx", $rawCert)
+    $cert = Import-PfxCertificate -FilePath "$tempDirectory\YourCert.pfx" -CertStoreLocation Cert:\LocalMachine\My -Password $certPass
 
     $thumbprint = $cert.Thumbprint
 
-    Export-Certificate -Cert cert:\localmachine\my\$thumbprint -FilePath "$($tempDirectory)\OrchPublicKey.cer" -force
-
-    Import-Certificate -FilePath "$($tempDirectory)\OrchPublicKey.cer" -CertStoreLocation "cert:\LocalMachine\Root"
-
-    #install Orchestrator
-
-    $getEncryptionKey = Generate-Key -passphrase $passphrase
+    #install Orchestrator Feature no matter the version
 
     $msiFeatures = @("OrchestratorFeature")
 
-    if ($orchestratorVersion.StartsWith("2")) {
-
-        $msiFeatures += @("IdentityFeature")
-        
-        try {
-          
-          Install-DotNetHostingBundle -DotNetHostingBundlePath "$tempDirectory\dotnet-hosting-3.1.3-win.exe"
-          
-        }
-        catch {
-          Write-Error $_.exception.message
-          Log-Error -LogPath $sLogFile -ErrorDesc "$($_.exception.message) installing Dotnet hosting" -ExitGracefully $True
-      }
-
-    }
+    $getEncryptionKey = Generate-Key -passphrase $passphrase
 
     $msiProperties = @{ }
     $msiProperties += @{
-        "ORCHESTRATORFOLDER"          = "`"$($orchestratorFolder)`"";
-        "DB_SERVER_NAME"              = "$($databaseServerName)";
-        "DB_DATABASE_NAME"            = "$($databaseName)";
-		    "HOSTADMIN_PASSWORD"          = "$($orchestratorAdminPassword)";
-        "DEFAULTTENANTADMIN_PASSWORD" = "$($orchestratorAdminPassword)";										
-        "APP_ENCRYPTION_KEY"          = "$($getEncryptionKey.encryptionKey)";
-        "APP_NUGET_ACTIVITIES_KEY"    = "$($getEncryptionKey.nugetKey)";
-        "APP_NUGET_PACKAGES_KEY"      = "$($getEncryptionKey.nugetKey)";
-        "APP_MACHINE_DECRYPTION_KEY"  = "$($getEncryptionKey.DecryptionKey)";
-        "APP_MACHINE_VALIDATION_KEY"  = "$($getEncryptionKey.Validationkey)";
-        "TELEMETRY_ENABLED"           = "0";
+      "ORCHESTRATORFOLDER"          = "`"$($orchestratorFolder)`"";
+      "DB_SERVER_NAME"              = "$($databaseServerName)";
+      "DB_DATABASE_NAME"            = "$($databaseName)";
+      "HOSTADMIN_PASSWORD"          = "$($orchestratorAdminPassword)";
+      "DEFAULTTENANTADMIN_PASSWORD" = "$($orchestratorAdminPassword)";										
+      "APP_ENCRYPTION_KEY"          = "$($getEncryptionKey.encryptionKey)";
+      "APP_NUGET_ACTIVITIES_KEY"    = "$($getEncryptionKey.nugetKey)";
+      "APP_NUGET_PACKAGES_KEY"      = "$($getEncryptionKey.nugetKey)";
+      "APP_MACHINE_DECRYPTION_KEY"  = "$($getEncryptionKey.DecryptionKey)";
+      "APP_MACHINE_VALIDATION_KEY"  = "$($getEncryptionKey.Validationkey)";
+      "TELEMETRY_ENABLED"           = "0";
     }
 
     if ($appPoolIdentityType -eq "USER") {
 
-        $msiProperties += @{
-            "APPPOOL_IDENTITY_TYPE" = "USER";
-            "APPPOOL_USER_NAME"     = "$($appPoolIdentityUser)";
-            "APPPOOL_PASSWORD"      = "$($appPoolIdentityUserPassword)";
-        }
+      $msiProperties += @{
+          "APPPOOL_IDENTITY_TYPE" = "USER";
+          "APPPOOL_USER_NAME"     = "$($appPoolIdentityUser)";
+          "APPPOOL_PASSWORD"      = "$($appPoolIdentityUserPassword)";
+      }
     }
     else {
-        $msiProperties += @{"APPPOOL_IDENTITY_TYPE" = "APPPOOLIDENTITY"; }
+      $msiProperties += @{"APPPOOL_IDENTITY_TYPE" = "APPPOOLIDENTITY"; }
     }
 
     if ($databaseAuthenticationMode -eq "SQL") {
@@ -285,6 +284,27 @@ function Main {
     }
     else {
         $msiProperties += @{"DB_AUTHENTICATION_MODE" = "WINDOWS"; }
+    }
+    
+    #adding Feature and properties required for 20.x version
+    if ($orchestratorVersion.StartsWith("2")) {
+
+      $msiFeatures += @("IdentityFeature")
+      $msiProperties += @{
+        "CERTIFICATE_SUBJECT"         = "$thumbprint"
+        "IS_CERTIFICATE_SUBJECT"      = "$thumbprint"
+      }
+
+      try {
+        
+        Install-DotNetHostingBundle -DotNetHostingBundlePath "$tempDirectory\dotnet-hosting-3.1.3-win.exe"
+        
+      }
+      catch {
+        Write-Error $_.exception.message
+        Log-Error -LogPath $sLogFile -ErrorDesc "$($_.exception.message) installing Dotnet hosting" -ExitGracefully $True
+      }
+
     }
 
     Install-UiPathOrchestratorEnterprise -msiPath "$($tempDirectory)\UiPathOrchestrator.msi" -logPath "$($sLogPath)\Install-UiPathOrchestrator.log" -msiFeatures $msiFeatures -msiProperties $msiProperties

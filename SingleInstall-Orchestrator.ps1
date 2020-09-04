@@ -128,7 +128,7 @@ param(
     $certificatePass,
 
     [Parameter()]
-    [string] 
+    [System.Buffers.Text.Base64]
     $certificateBase64
 
 )
@@ -238,6 +238,7 @@ function Main {
     $certPass = $($certificatePass) | ConvertTo-SecureString -AsPlainText -Force
     $rawCert = [System.Convert]::FromBase64String($($certificateBase64))
     [io.file]::WriteAllBytes("$tempDirectory\UiPathSSLCertificate.pfx", $rawCert)
+    Import-PfxCertificate -FilePath "$tempDirectory\UiPathSSLCertificate.pfx" -CertStoreLocation Cert:\LocalMachine\Root -Password $certPass
     $cert = Import-PfxCertificate -FilePath "$tempDirectory\UiPathSSLCertificate.pfx" -CertStoreLocation Cert:\LocalMachine\My -Password $certPass
 
     $thumbprint = $cert.Thumbprint

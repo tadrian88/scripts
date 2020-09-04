@@ -128,7 +128,7 @@ param(
     $certificatePass,
 
     [Parameter()]
-    [System.Buffers.Text.Base64]
+    [string]
     $certificateBase64
 
 )

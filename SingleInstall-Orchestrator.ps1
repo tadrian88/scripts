@@ -233,15 +233,9 @@ function Main {
     # install .Net 4.7.2
     Install-DotNetFramework -dotNetFrameworkPath "$tempDirectory\NDP472-KB4054530-x86-x64-AllOS-ENU.exe"
 
-    Write-Output "$(Get-Date) Installing self signed certificate for IIS, exporting and importing to LocalMachine Root"
-    
-    $link = "https://raw.githubusercontent.com/tadrian88/scripts/master/root.pfx"
-    $file = "root.pfx"
+    Write-Output "$(Get-Date) Installing self signed certificate for IIS, exporting and importing to LocalMachine My Store"
 
     Invoke-WebRequest -Uri $link -OutFile "$tempDirectory\$file"
-
-    $rootPass = "12345" | ConvertTo-SecureString -AsPlainText -Force
-    Import-PfxCertificate -FilePath "$tempDirectory\$file" -CertStoreLocation Cert:\LocalMachine\Root -Password $rootPass
 
     $certPass = $($certificatePass) | ConvertTo-SecureString -AsPlainText -Force
     $rawCert = [System.Convert]::FromBase64String($($certificateBase64))

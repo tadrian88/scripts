@@ -235,8 +235,6 @@ function Main {
 
     Write-Output "$(Get-Date) Installing self signed certificate for IIS, exporting and importing to LocalMachine My Store"
 
-    Invoke-WebRequest -Uri $link -OutFile "$tempDirectory\$file"
-
     $certPass = $($certificatePass) | ConvertTo-SecureString -AsPlainText -Force
     $rawCert = [System.Convert]::FromBase64String($($certificateBase64))
     [io.file]::WriteAllBytes("$tempDirectory\UiPathSSLCertificate.pfx", $rawCert)

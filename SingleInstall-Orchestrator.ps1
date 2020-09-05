@@ -235,13 +235,30 @@ function Main {
 
     Write-Output "$(Get-Date) Installing self signed certificate for IIS, exporting and importing to LocalMachine My Store"
 
-    $certPass = $($certificatePass) | ConvertTo-SecureString -AsPlainText -Force
-    $rawCert = [System.Convert]::FromBase64String($($certificateBase64))
-    [io.file]::WriteAllBytes("$tempDirectory\UiPathSSLCertificate.pfx", $rawCert)
-    Import-PfxCertificate -FilePath "$tempDirectory\UiPathSSLCertificate.pfx" -CertStoreLocation Cert:\LocalMachine\Root -Password $certPass
-    $cert = Import-PfxCertificate -FilePath "$tempDirectory\UiPathSSLCertificate.pfx" -CertStoreLocation Cert:\LocalMachine\My -Password $certPass
+    if (!$certificateBase64) {
 
-    $thumbprint = $cert.Thumbprint
+      $installCert = New-SelfSignedCertificate -Subject "CN=$orchestratorHostname" `
+        -DnsName "$orchestratorHostname" `
+        -Type SSLServerAuthentication `
+        -KeyExportPolicy Exportable `
+        -FriendlyName "Orchestrator Self-Signed Install Certificate" `
+        -HashAlgorithm sha256 -KeyLength 2048 `
+        -NotAfter (Get-Date).AddYears(20) `
+        -CertStoreLocation "cert:\LocalMachine\My" `
+        -KeySpec KeyExchange
+    
+      $thumbprint = $installCert.Thumbprint
+    }
+    else {
+
+      $userCertPass = $($certificatePass) | ConvertTo-SecureString -AsPlainText -Force
+      $userRawCert = [System.Convert]::FromBase64String($($certificateBase64))
+      [io.file]::WriteAllBytes("$tempDirectory\UiPathSSLCertificate.pfx", $userRawCert)
+      Import-PfxCertificate -FilePath "$tempDirectory\UiPathSSLCertificate.pfx" -CertStoreLocation Cert:\LocalMachine\Root -Password $userCertPass
+      $userCert = Import-PfxCertificate -FilePath "$tempDirectory\UiPathSSLCertificate.pfx" -CertStoreLocation Cert:\LocalMachine\My -Password $userCertPass
+
+      $thumbprint = $userCert.Thumbprint
+    }
 
     #install Orchestrator Feature no matter the version
 

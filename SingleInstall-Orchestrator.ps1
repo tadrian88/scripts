@@ -336,10 +336,6 @@ function Main {
     #Remove the default Binding
     Remove-WebBinding -Name "Default Web Site" -BindingInformation "*:80:"
 
-    #add public DNS to bindings
-    New-WebBinding -Name "UiPath*" -IPAddress "*" -Protocol http
-    New-WebBinding -Name "UiPath*" -IPAddress "*" -Protocol https
-
     #stopping default website
     Set-ItemProperty "IIS:\Sites\Default Web Site" serverAutoStart False
     Stop-Website 'Default Web Site'

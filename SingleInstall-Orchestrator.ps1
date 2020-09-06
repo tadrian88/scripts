@@ -248,6 +248,12 @@ function Main {
         -KeySpec KeyExchange
     
       $thumbprint = $installCert.Thumbprint
+
+      $mypwd = ConvertTo-SecureString -String "1234" -Force -AsPlainText
+
+      Export-PfxCertificate -Cert cert:\LocalMachine\my\$thumbprint -FilePath "$tempDirectory\UiPathSSLCertificate.pfx" -NoProperties -Password $mypwd
+
+      Import-PfxCertificate -FilePath "$tempDirectory\UiPathSSLCertificate.pfx" -CertStoreLocation Cert:\LocalMachine\Root -Password $mypwd
     }
     else {
 

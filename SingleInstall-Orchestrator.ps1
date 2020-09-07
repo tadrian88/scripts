@@ -116,20 +116,20 @@ param(
     [string] $orchestratorLicenseCode,
 
     [Parameter()]
-    [string]
-    $certificateSubject,
+    [string] 
+    $ISCertificateBase64,
 
     [Parameter()]
     [string] 
-    $ISCertificateSubject,
-
-    [Parameter()]
-    [string] 
-    $certificatePass,
+    $ISCertificatePass,
 
     [Parameter()]
     [string]
-    $certificateBase64
+    $certificateBase64,
+
+    [Parameter()]
+    [string] 
+    $certificatePass
 
 )
 #Enable TLS12
@@ -247,23 +247,36 @@ function Main {
         -CertStoreLocation "cert:\LocalMachine\My" `
         -KeySpec KeyExchange
     
-      $thumbprint = $installCert.Thumbprint
+      $selfSignedThumbprint = $installCert.Thumbprint
 
-      $mypwd = ConvertTo-SecureString -String "1234" -Force -AsPlainText
+      $mypwd = ConvertTo-SecureString -String "1234sslcert" -Force -AsPlainText
 
-      Export-PfxCertificate -Cert cert:\LocalMachine\my\$thumbprint -FilePath "$tempDirectory\UiPathSSLCertificate.pfx" -NoProperties -Password $mypwd
+      Export-PfxCertificate -Cert cert:\LocalMachine\my\$selfSignedThumbprint -FilePath "$tempDirectory\UiPathSSLCertificate.pfx" -NoProperties -Password $mypwd
 
       Import-PfxCertificate -FilePath "$tempDirectory\UiPathSSLCertificate.pfx" -CertStoreLocation Cert:\LocalMachine\Root -Password $mypwd
     }
     else {
 
-      $userCertPass = $($certificatePass) | ConvertTo-SecureString -AsPlainText -Force
-      $userRawCert = [System.Convert]::FromBase64String($($certificateBase64))
-      [io.file]::WriteAllBytes("$tempDirectory\UiPathSSLCertificate.pfx", $userRawCert)
-      Import-PfxCertificate -FilePath "$tempDirectory\UiPathSSLCertificate.pfx" -CertStoreLocation Cert:\LocalMachine\Root -Password $userCertPass
-      $userCert = Import-PfxCertificate -FilePath "$tempDirectory\UiPathSSLCertificate.pfx" -CertStoreLocation Cert:\LocalMachine\My -Password $userCertPass
+      #$userRawCert = [System.Convert]::FromBase64String($($certificateBase64))
+      #[io.file]::WriteAllBytes("$tempDirectory\UiPathSSLCertificate.pfx", $userRawCert)
+      
 
-      $thumbprint = $userCert.Thumbprint
+      $userCertificatePass = $($certificatePass) | ConvertTo-SecureString -AsPlainText -Force
+      ConvertBase64StringToPfxCertificate -base64String $certificateBase64 -pfxCertificateName "userSslCertificate.pfx"
+
+      #TODO Remove import to root Store when production ready
+      Import-PfxCertificate -FilePath "$tempDirectory\userSslCertificate.pfx" -CertStoreLocation Cert:\LocalMachine\Root -Password $userCertificatePass
+      $userSslCert = Import-PfxCertificate -FilePath "$tempDirectory\UiPathSSLCertificate.pfx" -CertStoreLocation Cert:\LocalMachine\My -Password $userCertificatePass
+      $userSslthumbprint = $userSslCert.Thumbprint
+
+      $userISCertificatePass = $($ISCertificatePass) | ConvertTo-SecureString -AsPlainText -Force
+      ConvertBase64StringToPfxCertificate -base64String $ISCertificateBase64 -pfxCertificateName "userIsCertificate.pfx"
+
+      #TODO Remove import to root Store when production ready
+      Import-PfxCertificate -FilePath "$tempDirectory\userIsCertificate.pfx" -CertStoreLocation Cert:\LocalMachine\Root -Password $userISCertificatePass
+      $userIsCert = Import-PfxCertificate -FilePath "$tempDirectory\userIsCertificate.pfx" -CertStoreLocation Cert:\LocalMachine\My -Password $userISCertificatePass
+      $userIsThumbprint = $userIsCert.Thumbprint
+
     }
 
     #install Orchestrator Feature no matter the version
@@ -314,9 +327,18 @@ function Main {
     if ($orchestratorVersion.StartsWith("2")) {
 
       $msiFeatures += @("IdentityFeature")
-      $msiProperties += @{
-        "CERTIFICATE_SUBJECT"         = "$thumbprint"
-        "IS_CERTIFICATE_SUBJECT"      = "$thumbprint"
+
+      if (!$certificateBase64) {
+        $msiProperties += @{
+          "CERTIFICATE_SUBJECT"         = "$selfSignedThumbprint"
+          "IS_CERTIFICATE_SUBJECT"      = "$selfSignedThumbprint"
+        }
+      }
+      else{
+        $msiProperties += @{
+          "CERTIFICATE_SUBJECT"         = "$userSslthumbprint"
+          "IS_CERTIFICATE_SUBJECT"      = "$userIsThumbprint"
+        }
       }
 
       try {
@@ -1080,6 +1102,47 @@ function Download-File {
     Catch {
         Log-Error -LogPath $sLogFile -ErrorDesc "The following error occurred: $_" -ExitGracefully $True
     }
+}
+
+<#
+  .SYNOPSIS
+    Creates pfx certificate file
+
+  .DESCRIPTION
+    Converts the base64 string representation of a pfx certificate back to a pfx that can be imported on the local machine.
+
+  .PARAMETER base64String
+    Mandatory. Base64 String.
+
+  .PARAMETER pfxCertificateName
+    Mandatory. Name of certificate file to be created. Example: MyCertificate.pfx
+
+  .INPUTS
+    Parameters above
+
+  .OUTPUTS
+    Certificate file created
+ #>
+function ConvertBase64StringToPfxCertificate {
+  param (
+    [Parameter(Mandatory = $true)]
+    [string] $base64String,
+
+    [Parameter(Mandatory = $true)]
+    [string] $pfxCertificateName
+  )
+
+  try {
+
+    $rawByteCert = [System.Convert]::FromBase64String($($base64String))
+
+    [io.file]::WriteAllBytes("$tempDirectory\$pfxCertificateName", $rawByteCert)
+  
+  }
+  catch {
+    Log-Error -LogPath $sLogFile -ErrorDesc "Failed to convert base64 string to PFX file. Reason: $_" -ExitGracefully $True
+  }
+
 }
 
 <#

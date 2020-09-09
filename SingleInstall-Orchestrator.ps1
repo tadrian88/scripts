@@ -280,8 +280,6 @@ function Main {
       $userISCertificatePass = $($ISCertificatePass) | ConvertTo-SecureString -AsPlainText -Force
       ConvertBase64StringToPfxCertificate -base64String $ISCertificateBase64 -pfxCertificateName "userIsCertificate.pfx"
 
-      #TODO Remove import to root Store when production ready
-      Import-PfxCertificate -FilePath "$tempDirectory\userIsCertificate.pfx" -CertStoreLocation Cert:\LocalMachine\Root -Password $userISCertificatePass
       $userIsCert = Import-PfxCertificate -FilePath "$tempDirectory\userIsCertificate.pfx" -CertStoreLocation Cert:\LocalMachine\My -Password $userISCertificatePass
       $userIsThumbprint = $userIsCert.Thumbprint
 
@@ -309,8 +307,6 @@ function Main {
       $userCertificatePass = $($certificatePass) | ConvertTo-SecureString -AsPlainText -Force
       ConvertBase64StringToPfxCertificate -base64String $certificateBase64 -pfxCertificateName "userSslCertificate.pfx"
 
-      #TODO Remove import to root Store when production ready
-      Import-PfxCertificate -FilePath "$tempDirectory\userSslCertificate.pfx" -CertStoreLocation Cert:\LocalMachine\Root -Password $userCertificatePass
       $userSslCert = Import-PfxCertificate -FilePath "$tempDirectory\UiPathSSLCertificate.pfx" -CertStoreLocation Cert:\LocalMachine\My -Password $userCertificatePass
       $userSslthumbprint = $userSslCert.Thumbprint
     }
@@ -319,16 +315,12 @@ function Main {
       $userCertificatePass = $($certificatePass) | ConvertTo-SecureString -AsPlainText -Force
       ConvertBase64StringToPfxCertificate -base64String $certificateBase64 -pfxCertificateName "userSslCertificate.pfx"
 
-      #TODO Remove import to root Store when production ready
-      Import-PfxCertificate -FilePath "$tempDirectory\userSslCertificate.pfx" -CertStoreLocation Cert:\LocalMachine\Root -Password $userCertificatePass
-      $userSslCert = Import-PfxCertificate -FilePath "$tempDirectory\UiPathSSLCertificate.pfx" -CertStoreLocation Cert:\LocalMachine\My -Password $userCertificatePass
+      $userSslCert = Import-PfxCertificate -FilePath "$tempDirectory\userSslCertificate.pfx" -CertStoreLocation Cert:\LocalMachine\My -Password $userCertificatePass
       $userSslthumbprint = $userSslCert.Thumbprint
 
       $userISCertificatePass = $($ISCertificatePass) | ConvertTo-SecureString -AsPlainText -Force
       ConvertBase64StringToPfxCertificate -base64String $ISCertificateBase64 -pfxCertificateName "userIsCertificate.pfx"
 
-      #TODO Remove import to root Store when production ready
-      Import-PfxCertificate -FilePath "$tempDirectory\userIsCertificate.pfx" -CertStoreLocation Cert:\LocalMachine\Root -Password $userISCertificatePass
       $userIsCert = Import-PfxCertificate -FilePath "$tempDirectory\userIsCertificate.pfx" -CertStoreLocation Cert:\LocalMachine\My -Password $userISCertificatePass
       $userIsThumbprint = $userIsCert.Thumbprint
     }

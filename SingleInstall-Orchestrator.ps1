@@ -235,32 +235,87 @@ function Main {
 
     Write-Output "$(Get-Date) Installing self signed certificate for IIS, exporting and importing to LocalMachine My Store"
 
-    if (!$certificateBase64) {
+    if (!$certificateBase64 -and !$ISCertificateBase64) {
+
+      $useSelfSigned = $True
 
       $installCert = New-SelfSignedCertificate -Subject "CN=$orchestratorHostname" `
         -DnsName "$orchestratorHostname" `
         -Type SSLServerAuthentication `
         -KeyExportPolicy Exportable `
-        -FriendlyName "Orchestrator Self-Signed Install Certificate" `
+        -FriendlyName "Orchestrator Self-Signed SSL Certificate" `
+        -HashAlgorithm sha256 -KeyLength 2048 `
+        -NotAfter (Get-Date).AddYears(20) `
+        -CertStoreLocation "cert:\LocalMachine\My" `
+    
+      $SelfSignedThumbprint = $installCert.Thumbprint
+
+      $mypwd = ConvertTo-SecureString -String "1234sslcert" -Force -AsPlainText
+
+      Export-PfxCertificate -Cert cert:\LocalMachine\my\$SelfSignedThumbprint -FilePath "$tempDirectory\UiPathSSLCertificate.pfx" -NoProperties -Password $mypwd
+
+      Import-PfxCertificate -FilePath "$tempDirectory\UiPathSSLCertificate.pfx" -CertStoreLocation Cert:\LocalMachine\Root -Password $mypwd
+
+    }
+    
+    elseif(!$certificateBase64) {
+
+      $installSslCert = New-SelfSignedCertificate -Subject "CN=$orchestratorHostname" `
+        -DnsName "$orchestratorHostname" `
+        -Type SSLServerAuthentication `
+        -KeyExportPolicy Exportable `
+        -FriendlyName "Orchestrator Self-Signed SSL Certificate" `
+        -HashAlgorithm sha256 -KeyLength 2048 `
+        -NotAfter (Get-Date).AddYears(20) `
+        -CertStoreLocation "cert:\LocalMachine\My" `
+    
+      $sslSelfSignedThumbprint = $installSslCert.Thumbprint
+
+      $mypwd = ConvertTo-SecureString -String "1234sslcert" -Force -AsPlainText
+
+      Export-PfxCertificate -Cert cert:\LocalMachine\my\$SelfSignedThumbprint -FilePath "$tempDirectory\UiPathSSLCertificate.pfx" -NoProperties -Password $mypwd
+
+      Import-PfxCertificate -FilePath "$tempDirectory\UiPathSSLCertificate.pfx" -CertStoreLocation Cert:\LocalMachine\Root -Password $mypwd  
+
+      $userISCertificatePass = $($ISCertificatePass) | ConvertTo-SecureString -AsPlainText -Force
+      ConvertBase64StringToPfxCertificate -base64String $ISCertificateBase64 -pfxCertificateName "userIsCertificate.pfx"
+
+      #TODO Remove import to root Store when production ready
+      Import-PfxCertificate -FilePath "$tempDirectory\userIsCertificate.pfx" -CertStoreLocation Cert:\LocalMachine\Root -Password $userISCertificatePass
+      $userIsCert = Import-PfxCertificate -FilePath "$tempDirectory\userIsCertificate.pfx" -CertStoreLocation Cert:\LocalMachine\My -Password $userISCertificatePass
+      $userIsThumbprint = $userIsCert.Thumbprint
+
+    }
+    elseif (!$ISCertificateBase64) {
+      #generate new self signed certificate for Identity Server
+      $installIsCert = New-SelfSignedCertificate -Subject "CN=$orchestratorHostname" `
+        -DnsName "$orchestratorHostname" `
+        -Type SSLServerAuthentication `
+        -KeyExportPolicy Exportable `
+        -FriendlyName "Orchestrator Self-Signed SSL Certificate" `
         -HashAlgorithm sha256 -KeyLength 2048 `
         -NotAfter (Get-Date).AddYears(20) `
         -CertStoreLocation "cert:\LocalMachine\My" `
         -KeySpec KeyExchange
     
-      $selfSignedThumbprint = $installCert.Thumbprint
+      $isSelfSignedThumbprint = $installIsCert.Thumbprint
 
       $mypwd = ConvertTo-SecureString -String "1234sslcert" -Force -AsPlainText
 
-      Export-PfxCertificate -Cert cert:\LocalMachine\my\$selfSignedThumbprint -FilePath "$tempDirectory\UiPathSSLCertificate.pfx" -NoProperties -Password $mypwd
+      Export-PfxCertificate -Cert cert:\LocalMachine\my\$isSelfSignedThumbprint -FilePath "$tempDirectory\UiPathISCertificate.pfx" -NoProperties -Password $mypwd
 
-      Import-PfxCertificate -FilePath "$tempDirectory\UiPathSSLCertificate.pfx" -CertStoreLocation Cert:\LocalMachine\Root -Password $mypwd
+      Import-PfxCertificate -FilePath "$tempDirectory\UiPathISCertificate.pfx" -CertStoreLocation Cert:\LocalMachine\Root -Password $mypwd
+
+      $userCertificatePass = $($certificatePass) | ConvertTo-SecureString -AsPlainText -Force
+      ConvertBase64StringToPfxCertificate -base64String $certificateBase64 -pfxCertificateName "userSslCertificate.pfx"
+
+      #TODO Remove import to root Store when production ready
+      Import-PfxCertificate -FilePath "$tempDirectory\userSslCertificate.pfx" -CertStoreLocation Cert:\LocalMachine\Root -Password $userCertificatePass
+      $userSslCert = Import-PfxCertificate -FilePath "$tempDirectory\UiPathSSLCertificate.pfx" -CertStoreLocation Cert:\LocalMachine\My -Password $userCertificatePass
+      $userSslthumbprint = $userSslCert.Thumbprint
     }
     else {
-
-      #$userRawCert = [System.Convert]::FromBase64String($($certificateBase64))
-      #[io.file]::WriteAllBytes("$tempDirectory\UiPathSSLCertificate.pfx", $userRawCert)
       
-
       $userCertificatePass = $($certificatePass) | ConvertTo-SecureString -AsPlainText -Force
       ConvertBase64StringToPfxCertificate -base64String $certificateBase64 -pfxCertificateName "userSslCertificate.pfx"
 
@@ -276,7 +331,6 @@ function Main {
       Import-PfxCertificate -FilePath "$tempDirectory\userIsCertificate.pfx" -CertStoreLocation Cert:\LocalMachine\Root -Password $userISCertificatePass
       $userIsCert = Import-PfxCertificate -FilePath "$tempDirectory\userIsCertificate.pfx" -CertStoreLocation Cert:\LocalMachine\My -Password $userISCertificatePass
       $userIsThumbprint = $userIsCert.Thumbprint
-
     }
 
     #install Orchestrator Feature no matter the version
@@ -328,10 +382,23 @@ function Main {
 
       $msiFeatures += @("IdentityFeature")
 
-      if (!$certificateBase64) {
+      if ($useSelfSigned) {
         $msiProperties += @{
-          "CERTIFICATE_SUBJECT"         = "$selfSignedThumbprint"
-          "IS_CERTIFICATE_SUBJECT"      = "$selfSignedThumbprint"
+          "CERTIFICATE_SUBJECT"         = "$SelfSignedThumbprint"
+          "IS_CERTIFICATE_SUBJECT"      = "$SelfSignedThumbprint"
+        }
+      }
+      
+      elseif (!$ISCertificateBase64) {
+        $msiProperties += @{
+          "CERTIFICATE_SUBJECT"         = "$userSslthumbprint"
+          "IS_CERTIFICATE_SUBJECT"      = "$isSelfSignedThumbprint"
+        }
+      }  
+      elseif (!$certificateBase64) {
+        $msiProperties += @{
+          "CERTIFICATE_SUBJECT"         = "$sslSelfSignedThumbprint"
+          "IS_CERTIFICATE_SUBJECT"      = "$userIsThumbprint"
         }
       }
       else{
@@ -493,7 +560,6 @@ function Main {
         }
 
     }
-
 }
 
 <#

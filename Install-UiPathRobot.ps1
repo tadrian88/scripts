@@ -23,10 +23,7 @@ Param (
     [string] $credType,
     [Parameter(Mandatory = $true)]
     [ValidateSet("20.4.3","19.10.5","19.4.6","18.4.8")]
-    [String] $RobotVersion,
-    [Parameter()]
-    [ValidateSet("Yes", "No")]
-    [string]$addRobotsToExistingEnvs = "No"
+    [String] $RobotVersion
 )
 
 #Set Error Action to Silently Continue
@@ -229,27 +226,6 @@ function Main {
             Remove-Item $script:tempDirectory -Recurse -Force | Out-Null
 
         }
-
-        if ($addRobotsToExistingEnvs -eq "Yes") {
-
-          #add Robot to existing Envs
-          $getOdataEnv = "$orchestratorUrl/odata/Environments"
-
-          $getOdataEnvironment = Invoke-RestMethod -Uri $getOdataEnv -Method Get -ContentType "application/json" -UseBasicParsing -WebSession $websession
-
-          foreach ($roEnv in $getOdataEnvironment.value.Id) {
-
-              $roEnvURL = "$orchestratorUrl/odata/Environments($($roEnv))/UiPath.Server.Configuration.OData.AddRobot"
-
-              $dataRobotEnv = @{
-                  robotId = "$($botWebResponse.Id)"
-              } | ConvertTo-Json
-
-              $botToEnvironment = Invoke-RestMethod -Uri $roEnvURL -Method Post -Body $dataRobotEnv -ContentType "application/json" -UseBasicParsing -WebSession $websession
-
-          }
-
-      }
 
     }
 

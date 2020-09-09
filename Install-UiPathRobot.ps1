@@ -108,7 +108,7 @@ function Main {
 
             $dataLogin = @{
                 tenancyName            = $Tennant
-                usernameOrEmailAddress = $orchAdmin
+                UsernameOrEmailAddress = $orchAdmin
                 password               = $orchPassword
             } | ConvertTo-Json
 
